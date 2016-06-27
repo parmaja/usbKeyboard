@@ -30,11 +30,9 @@ typedef uint8_t byte;
 
 typedef struct kbd_data
 {
-	//uint8_t report_id;
+	uint8_t report_id;
     uint8_t modifiers;
-	uint8_t key;
-    //int8_t x;
-    //int8_t y;
+	uint8_t key; //TODO should be array
 } kbd_data_t;
 
 #define KEYS_COUNT 1 // Minimum of 1, we will increase it in the future
@@ -49,30 +47,34 @@ static uchar    idleRate;           // in 4 ms units
  * Redundant entries (such as LOGICAL_MINIMUM and USAGE_PAGE) have been omitted
  * for the second INPUT item.
  * You need to modify USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH in usbconfig.h if you changed it.
+ *
+ * //http://www.microchip.com/forums/FindPost/878780 
  */
 
-PROGMEM const char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] = { /* USB report descriptor */
-  0x05, 0x01,                    // USAGE_PAGE (Generic Desktop)
-  0x09, 0x06,                    // USAGE (Keyboard)
-  0xa1, 0x01,                    // COLLECTION (Application)
-  0x05, 0x07,                    //   USAGE_PAGE (Keyboard)
-  0x19, 0xe0,                    //   USAGE_MINIMUM (Keyboard LeftControl)
-  0x29, 0xe7,                    //   USAGE_MAXIMUM (Keyboard Right GUI)
-  0x15, 0x00,                    //   LOGICAL_MINIMUM (0)
-  0x25, 0x01,                    //   LOGICAL_MAXIMUM (1)
-  0x75, 0x01,                    //   REPORT_SIZE (1)
-  0x95, 0x08,                    //   REPORT_COUNT (8)
-  0x81, 0x02,                    //   INPUT (Data,Var,Abs)
-  0x95, KEYS_COUNT-1,           //   REPORT_COUNT (simultaneous keystrokes)
-  0x75, 0x08,                    //   REPORT_SIZE (8)
-  0x25, 0x65,                    //   LOGICAL_MAXIMUM (101)
-  0x19, 0x00,                    //   USAGE_MINIMUM (Reserved (no event indicated))
-  0x29, 0x65,                    //   USAGE_MAXIMUM (Keyboard Application)
-  0x81, 0x00,                    //   INPUT (Data,Ary,Abs)
-  0xc0                           // END_COLLECTION
+PROGMEM const char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] = // USB report descriptor
+{
+	0x05, 0x01,                    //USAGE_PAGE (Generic Desktop)
+	0x09, 0x06,                    // USAGE (Keyboard)
+	0xa1, 0x01,                    //COLLECTION (Application)
+	0x85, 0x01,    				   //   Report ID=1
+	//Modifiers
+	0x05, 0x07,                    //   USAGE_PAGE (Keyboard)
+	0x19, 0xe0,                    //   USAGE_MINIMUM (Keyboard LeftControl)
+	0x29, 0xe7,                    //   USAGE_MAXIMUM (Keyboard Right GUI)
+	0x15, 0x00,                    //   LOGICAL_MINIMUM (0)
+	0x25, 0x01,                    //   LOGICAL_MAXIMUM (1)
+	0x75, 0x01,                    //   REPORT_SIZE (1)
+	0x95, 0x08,                    //   REPORT_COUNT (8)
+	0x81, 0x02,                    //   INPUT (Data,Var,Abs)
+	//Key byte
+	0x75, 0x08,                    //   REPORT_SIZE(8)
+	0x95, 1,           			   //   REPORT_COUNT(1)
+	0x26, 0x86, 0x00,              //   LOGICAL_MAXIMUM (134)
+    0x19, 0x00,                    //   USAGE_MINIMUM (Reserved (no event indicated))
+    0x29, 0xe7,                    //   USAGE_MAXIMUM (Keyboard Right GUI)
+	0x81, 0x00,                    //   INPUT (Data,Ary,Abs)
+	0xc0                           //END_COLLECTION
 };
-
-
 
 /* Keyboard usage values, see usb.org's HID-usage-tables document, chapter
  * 10 Keyboard/Keypad Page for more codes.
@@ -128,11 +130,11 @@ PROGMEM const char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] 
 #define KEY_9		38
 #define KEY_0		39
 
-#define KEY_ENTER	40	
+#define KEY_ENTER	40
 #define KEY_ESC		41
-#define KEY_BACKSPACE	42	
+#define KEY_BACKSPACE	42
 #define KEY_TAB		43
-#define KEY_SPACE	44	
+#define KEY_SPACE	44
 #define KEY_CAPS_LOCK	57
 
 #define KEY_MINUS	45
@@ -161,15 +163,15 @@ PROGMEM const char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] 
 #define KEY_F11		68
 #define KEY_F12		69
 
-#define KEY_PRINTSCREEN	70		
-#define KEY_SCROLL_LOCK	71		
+#define KEY_PRINTSCREEN	70
+#define KEY_SCROLL_LOCK	71
 #define KEY_PAUSE	72
-#define KEY_INSERT	73	
+#define KEY_INSERT	73
 #define KEY_HOME	74
 #define KEY_PAGE_UP	75
 #define KEY_DELETE	76
 #define KEY_END		77
-#define KEY_PAGE_DOWN	78	
+#define KEY_PAGE_DOWN	78
 #define KEY_RIGHT	79
 #define KEY_LEFT	80
 #define KEY_DOWN	81
@@ -177,22 +179,22 @@ PROGMEM const char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] 
 
 #define KEY_NUM_LOCK	83
 
-#define KEYPAD_SLASH	84	
-#define KEYPAD_ASTERIX	85	
-#define KEYPAD_MINUS	86	
-#define KEYPAD_PLUS	87	
-#define KEYPAD_ENTER	88	
+#define KEYPAD_SLASH	84
+#define KEYPAD_ASTERIX	85
+#define KEYPAD_MINUS	86
+#define KEYPAD_PLUS	87
+#define KEYPAD_ENTER	88
 #define KEYPAD_1	89
 #define KEYPAD_2	90
-#define KEYPAD_3	91	
-#define KEYPAD_4	92	
-#define KEYPAD_5	93	
-#define KEYPAD_6	94	
-#define KEYPAD_7	95	
-#define KEYPAD_8	96	
-#define KEYPAD_9	97	
-#define KEYPAD_0	98		
-#define KEYPAD_PERIOD	99	
+#define KEYPAD_3	91
+#define KEYPAD_4	92
+#define KEYPAD_5	93
+#define KEYPAD_6	94
+#define KEYPAD_7	95
+#define KEYPAD_8	96
+#define KEYPAD_9	97
+#define KEYPAD_0	98
+#define KEYPAD_PERIOD	99
 
 #define KEY_KEYBOARD_NON_US_BACKSLASH    100
 #define KEY_APPLICATION    101
@@ -280,6 +282,7 @@ class UsbKeyboardDevice {
 
     memset(&reportBuffer.data, 0, sizeof(reportBuffer.data));
 
+	reportBuffer.data.report_id = 1;
     reportBuffer.data.modifiers = modifiers;
     reportBuffer.data.key = keyStroke;
 
