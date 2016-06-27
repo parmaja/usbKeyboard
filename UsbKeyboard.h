@@ -28,7 +28,16 @@ extern "C"
 
 typedef uint8_t byte;
 
-#define BUFFER_SIZE 4 // Minimum of 2: 1 for modifiers + 1 for keystroke
+typedef struct kbd_data
+{
+	//uint8_t report_id;
+    uint8_t modifiers;
+	uint8_t key;
+    //int8_t x;
+    //int8_t y;
+} kbd_data_t;
+
+#define KEYS_COUNT 1 // Minimum of 1, we will increase it in the future
 
 static uchar    idleRate;           // in 4 ms units
 
@@ -41,6 +50,7 @@ static uchar    idleRate;           // in 4 ms units
  * for the second INPUT item.
  * You need to modify USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH in usbconfig.h if you changed it.
  */
+
 PROGMEM const char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] = { /* USB report descriptor */
   0x05, 0x01,                    // USAGE_PAGE (Generic Desktop)
   0x09, 0x06,                    // USAGE (Keyboard)
@@ -53,7 +63,7 @@ PROGMEM const char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] 
   0x75, 0x01,                    //   REPORT_SIZE (1)
   0x95, 0x08,                    //   REPORT_COUNT (8)
   0x81, 0x02,                    //   INPUT (Data,Var,Abs)
-  0x95, BUFFER_SIZE-1,           //   REPORT_COUNT (simultaneous keystrokes)
+  0x95, KEYS_COUNT-1,           //   REPORT_COUNT (simultaneous keystrokes)
   0x75, 0x08,                    //   REPORT_SIZE (8)
   0x25, 0x65,                    //   LOGICAL_MAXIMUM (101)
   0x19, 0x00,                    //   USAGE_MINIMUM (Reserved (no event indicated))
@@ -223,13 +233,20 @@ PROGMEM const char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] 
 #define KEY_ARROW_LEFT KEY_LEFT //deprecated
  
 class UsbKeyboardDevice {
- public:
-  UsbKeyboardDevice () {
-    PORTD = 0; // TODO: Only for USB pins?
-    DDRD |= ~USBMASK;
+  protected:
+	union {
+		uchar report;
+		kbd_data data;
+	} reportBuffer;    // buffer for HID reports
+
+  public:
+  UsbKeyboardDevice() {
+	USBOUT = 0; // TODO: Only for USB pins?
+    USBDDR |= ~USBMASK;
 
     cli();
     usbDeviceDisconnect();
+    //_delay_ms(75);	
     usbDeviceConnect();
 
     usbInit();
@@ -238,10 +255,13 @@ class UsbKeyboardDevice {
 
     // TODO: Remove the next two lines once we fix
     //       missing first keystroke bug properly.
-    memset(reportBuffer, 0, sizeof(reportBuffer));
-    usbSetInterrupt(reportBuffer, sizeof(reportBuffer));
+    memset(&reportBuffer.data, 0, sizeof(reportBuffer.data));
+    usbSetInterrupt(&reportBuffer.report, sizeof(reportBuffer.data));
   }
 
+  void delay(){
+	_delay_ms(75);	
+  }
   void update() {
     usbPoll();
   }
@@ -258,12 +278,12 @@ class UsbKeyboardDevice {
         //       sent.
     }
 
-    memset(reportBuffer, 0, sizeof(reportBuffer));
+    memset(&reportBuffer.data, 0, sizeof(reportBuffer.data));
 
-    reportBuffer[0] = modifiers;
-    reportBuffer[1] = keyStroke;
+    reportBuffer.data.modifiers = modifiers;
+    reportBuffer.data.key = keyStroke;
 
-    usbSetInterrupt(reportBuffer, sizeof(reportBuffer));
+    usbSetInterrupt(&reportBuffer.report, sizeof(reportBuffer.data));
 
     while (!usbInterruptIsReady()) {
       // Note: We wait until we can send keystroke
@@ -272,24 +292,21 @@ class UsbKeyboardDevice {
     }
 
     // This stops endlessly repeating keystrokes:
-    memset(reportBuffer, 0, sizeof(reportBuffer));
-    usbSetInterrupt(reportBuffer, sizeof(reportBuffer));
-
+    memset(&reportBuffer.data, 0, sizeof(reportBuffer.data));
+    usbSetInterrupt(&reportBuffer.report, sizeof(reportBuffer.data));
   }
-
-  //private: TODO: Make friend?
-  uchar    reportBuffer[4];    // buffer for HID reports [ 1 modifier byte + (len-1) key strokes]
-
 };
 
 UsbKeyboardDevice UsbKeyboard = UsbKeyboardDevice();
 
 usbMsgLen_t usbFunctionSetup(uchar data[8])
-  {
+{
     usbRequest_t    *rq = (usbRequest_t *)((void *)data);
 
-    usbMsgPtr = UsbKeyboard.reportBuffer; //
-    if((rq->bmRequestType & USBRQ_TYPE_MASK) == USBRQ_TYPE_CLASS){
+    //usbMsgPtr = (uchar *)UsbKeyboard.reportBuffer; 
+	
+    if((rq->bmRequestType & USBRQ_TYPE_MASK) == USBRQ_TYPE_CLASS)
+	{
       /* class request type */
 
       if(rq->bRequest == USBRQ_HID_GET_REPORT){
@@ -297,16 +314,17 @@ usbMsgLen_t usbFunctionSetup(uchar data[8])
 
 	/* we only have one report type, so don't look at wValue */
         // TODO: Ensure it's okay not to return anything here?
-	return 0;
+		return 0;
 
-      }else if(rq->bRequest == USBRQ_HID_GET_IDLE){
+      } else if(rq->bRequest == USBRQ_HID_GET_IDLE)
+	{
 	//            usbMsgPtr = &idleRate;
 	//            return 1;
-	return 0;
-      }else if(rq->bRequest == USBRQ_HID_SET_IDLE){
-	idleRate = rq->wValue.bytes[1];
+		return 0;
+      } else if(rq->bRequest == USBRQ_HID_SET_IDLE){
+			idleRate = rq->wValue.bytes[1];
       }
-    }else{
+    } else {
       /* no vendor specific requests implemented */
     }
     return 0;
