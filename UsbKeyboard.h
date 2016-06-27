@@ -28,12 +28,13 @@ extern "C"
 
 typedef uint8_t byte;
 
-typedef struct kbd_data
+typedef struct 
 {
 	uint8_t report_id;
     uint8_t modifiers;
-	uint8_t key; //TODO should be array
-} kbd_data_t;
+	uint8_t keycode; //TODO should be array
+	//uint8_t keycode[6];
+} keyboard_data_t;
 
 #define KEYS_COUNT 1 // Minimum of 1, we will increase it in the future
 
@@ -50,13 +51,18 @@ static uchar    idleRate;           // in 4 ms units
  *
  * //http://www.microchip.com/forums/FindPost/878780 
  */
+ 
+#define KEYCODE_LENGTH 1
+#define REPORT_ID_KEYBOARD 1
+#define REPORT_ID_CONSUMER 2
 
 PROGMEM const char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] = // USB report descriptor
 {
+	//LENGTH=40
 	0x05, 0x01,                    //USAGE_PAGE (Generic Desktop)
 	0x09, 0x06,                    // USAGE (Keyboard)
 	0xa1, 0x01,                    //COLLECTION (Application)
-	0x85, 0x01,    				   //   Report ID=1
+	0x85, REPORT_ID_KEYBOARD,    				   //   Report ID=1
 	//Modifiers
 	0x05, 0x07,                    //   USAGE_PAGE (Keyboard)
 	0x19, 0xe0,                    //   USAGE_MINIMUM (Keyboard LeftControl)
@@ -68,12 +74,27 @@ PROGMEM const char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] 
 	0x81, 0x02,                    //   INPUT (Data,Var,Abs)
 	//Key byte
 	0x75, 0x08,                    //   REPORT_SIZE(8)
-	0x95, 1,           			   //   REPORT_COUNT(1)
+	0x95, KEYCODE_LENGTH,          //   REPORT_COUNT(KEYCODE_LENGTH) //TODO If we are using array we will set it to the length of that array 6
+	0x15, 0x00,                    //   LOGICAL_MINIMUM (0)
 	0x26, 0x86, 0x00,              //   LOGICAL_MAXIMUM (134)
     0x19, 0x00,                    //   USAGE_MINIMUM (Reserved (no event indicated))
     0x29, 0xe7,                    //   USAGE_MAXIMUM (Keyboard Right GUI)
-	0x81, 0x00,                    //   INPUT (Data,Ary,Abs)
-	0xc0                           //END_COLLECTION
+	0x81, 0x00,                    //   INPUT (Data,Ary,Abs)	
+	0xc0,                           //END_COLLECTION
+	
+    /* consumer */
+    0x05, 0x0c,                    // USAGE_PAGE (Consumer Devices)
+    0x09, 0x01,                    // USAGE (Consumer Control)
+    0xa1, 0x01,                    // COLLECTION (Application)
+    0x85, REPORT_ID_CONSUMER,      //   REPORT_ID (2)
+    0x15, 0x01,                    //   LOGICAL_MINIMUM (0x1)
+    0x26, 0x9c, 0x02,              //   LOGICAL_MAXIMUM (0x29c)
+    0x19, 0x01,                    //   USAGE_MINIMUM (0x1)
+    0x2a, 0x9c, 0x02,              //   USAGE_MAXIMUM (0x29c)
+    0x75, 0x10,                    //   REPORT_SIZE (16)
+    0x95, 0x01,                    //   REPORT_COUNT (1)
+    0x81, 0x00,                    //   INPUT (Data,Array,Abs)
+    0xc0                          // END_COLLECTION	
 };
 
 /* Keyboard usage values, see usb.org's HID-usage-tables document, chapter
@@ -235,12 +256,9 @@ PROGMEM const char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] 
 #define KEY_ARROW_LEFT KEY_LEFT //deprecated
  
 class UsbKeyboardDevice {
-  protected:
-	union {
-		uchar report;
-		kbd_data data;
-	} reportBuffer;    // buffer for HID reports
-
+  public: //it should be protected
+	keyboard_data_t keyboard_data;    // buffer for HID reports	
+	
   public:
   UsbKeyboardDevice() {
 	USBOUT = 0; // TODO: Only for USB pins?
@@ -257,8 +275,8 @@ class UsbKeyboardDevice {
 
     // TODO: Remove the next two lines once we fix
     //       missing first keystroke bug properly.
-    memset(&reportBuffer.data, 0, sizeof(reportBuffer.data));
-    usbSetInterrupt(&reportBuffer.report, sizeof(reportBuffer.data));
+    memset(&keyboard_data, 0, sizeof(keyboard_data));
+    usbSetInterrupt((uchar *)&keyboard_data, sizeof(keyboard_data));
   }
 
   void delay(){
@@ -280,13 +298,13 @@ class UsbKeyboardDevice {
         //       sent.
     }
 
-    memset(&reportBuffer.data, 0, sizeof(reportBuffer.data));
+    memset(&keyboard_data, 0, sizeof(keyboard_data));
 
-	reportBuffer.data.report_id = 1;
-    reportBuffer.data.modifiers = modifiers;
-    reportBuffer.data.key = keyStroke;
+	keyboard_data.report_id = REPORT_ID_KEYBOARD;
+    keyboard_data.modifiers = modifiers;
+    keyboard_data.keycode = keyStroke;
 
-    usbSetInterrupt(&reportBuffer.report, sizeof(reportBuffer.data));
+    usbSetInterrupt((uchar *)&keyboard_data, sizeof(keyboard_data));
 
     while (!usbInterruptIsReady()) {
       // Note: We wait until we can send keystroke
@@ -295,8 +313,41 @@ class UsbKeyboardDevice {
     }
 
     // This stops endlessly repeating keystrokes:
-    memset(&reportBuffer.data, 0, sizeof(reportBuffer.data));
-    usbSetInterrupt(&reportBuffer.report, sizeof(reportBuffer.data));
+    memset(&keyboard_data, 0, sizeof(keyboard_data));
+    usbSetInterrupt((uchar *)&keyboard_data, sizeof(keyboard_data));
+  }
+  
+  
+  typedef struct {
+    uint8_t  report_id;
+    uint16_t data;
+} __attribute__ ((packed)) report_consumer_t;
+
+
+  void sendConsumer(uint16_t data) 
+  {
+    while (!usbInterruptIsReady()) {
+        // Note: We wait until we can send keystroke
+        //       so we know the previous keystroke was
+        //       sent.
+    }	
+	
+    report_consumer_t report = {
+        .report_id = REPORT_ID_CONSUMER,
+        .data = data
+	};	    
+
+    usbSetInterrupt((uchar *)&report, sizeof(report));
+
+    //while (!usbInterruptIsReady()) {
+      // Note: We wait until we can send keystroke
+      //       so we know the previous keystroke was
+      //       sent.
+    //}
+
+    // This stops endlessly repeating keystrokes:
+//    memset(&keyboard_data.data, 0, sizeof(keyboard_data.data));
+    //usbSetInterrupt(&keyboard_data.report, sizeof(keyboard_data.data));
   }
 };
 
@@ -306,7 +357,7 @@ usbMsgLen_t usbFunctionSetup(uchar data[8])
 {
     usbRequest_t    *rq = (usbRequest_t *)((void *)data);
 
-    //usbMsgPtr = (uchar *)UsbKeyboard.reportBuffer; 
+    usbMsgPtr = (uchar *)&UsbKeyboard.keyboard_data;  //it works without it, we need to more tests
 	
     if((rq->bmRequestType & USBRQ_TYPE_MASK) == USBRQ_TYPE_CLASS)
 	{
