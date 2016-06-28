@@ -271,6 +271,141 @@ PROGMEM const char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] 
 
 #define KEY_ARROW_LEFT KEY_LEFT //deprecated
  
+//ported from https://github.com/aduitsis/ardumultimedia/blob/master/HID.cpp
+#define SHIFT 0x80
+const uint8_t asciimap[128] =
+{
+	0x00,             // NUL
+	0x00,             // SOH
+	0x00,             // STX
+	0x00,             // ETX
+	0x00,             // EOT
+	0x00,             // ENQ
+	0x00,             // ACK  
+	0x00,             // BEL
+	KEY_BACKSPACE,			// BS	Backspace
+	KEY_TAB,			// TAB	Tab
+	KEY_ENTER,			// LF	Enter
+	0x00,             // VT 
+	0x00,             // FF 
+	0x00,             // CR 
+	0x00,             // SO 
+	0x00,             // SI 
+	0x00,             // DEL
+	0x00,             // DC1
+	0x00,             // DC2
+	0x00,             // DC3
+	0x00,             // DC4
+	0x00,             // NAK
+	0x00,             // SYN
+	0x00,             // ETB
+	0x00,             // CAN
+	0x00,             // EM 
+	0x00,             // SUB
+	0x00,             // ESC
+	0x00,             // FS 
+	0x00,             // GS 
+	0x00,             // RS 
+	0x00,             // US 
+
+	0x2c,		   //  ' '
+	0x1e|SHIFT,	   // !
+	0x34|SHIFT,	   // "
+	0x20|SHIFT,    // #
+	0x21|SHIFT,    // $
+	0x22|SHIFT,    // %
+	0x24|SHIFT,    // &
+	0x34,          // '
+	0x26|SHIFT,    // (
+	0x27|SHIFT,    // )
+	0x25|SHIFT,    // *
+	0x2e|SHIFT,    // +
+	0x36,          // ,
+	0x2d,          // -
+	0x37,          // .
+	0x38,          // /
+	0x27,          // 0
+	0x1e,          // 1
+	0x1f,          // 2
+	0x20,          // 3
+	0x21,          // 4
+	0x22,          // 5
+	0x23,          // 6
+	0x24,          // 7
+	0x25,          // 8
+	0x26,          // 9
+	0x33|SHIFT,      // :
+	0x33,          // ;
+	0x36|SHIFT,      // <
+	0x2e,          // =
+	0x37|SHIFT,      // >
+	0x38|SHIFT,      // ?
+	0x1f|SHIFT,      // @
+	KEY_A|SHIFT,      // A
+	KEY_B|SHIFT,      // B
+	KEY_C|SHIFT,      // C
+	KEY_D|SHIFT,      // D
+	KEY_E|SHIFT,      // E
+	KEY_F|SHIFT,      // F
+	KEY_G|SHIFT,      // G
+	KEY_H|SHIFT,      // H
+	KEY_I|SHIFT,      // I
+	KEY_J|SHIFT,      // J
+	KEY_K|SHIFT,      // K
+	KEY_L|SHIFT,      // L
+	KEY_M|SHIFT,      // M
+	KEY_N|SHIFT,      // N
+	KEY_O|SHIFT,      // O
+	KEY_P|SHIFT,      // P
+	KEY_Q|SHIFT,      // Q
+	KEY_R|SHIFT,      // R
+	KEY_S|SHIFT,      // S
+	KEY_T|SHIFT,      // T
+	KEY_U|SHIFT,      // U
+	KEY_V|SHIFT,      // V
+	KEY_W|SHIFT,      // W
+	KEY_X|SHIFT,      // X
+	KEY_Y|SHIFT,      // Y
+	KEY_Z|SHIFT,      // Z
+	0x2f,          // [
+	0x31,          // bslash
+	0x30,          // ]
+	0x23|SHIFT,    // ^
+	0x2d|SHIFT,    // _
+	0x35,          // `
+	KEY_A,          // a
+	KEY_B,          // b
+	KEY_C,          // c
+	KEY_D,          // d
+	KEY_E,          // e
+	KEY_F,          // f
+	KEY_G,          // g
+	KEY_H,          // h
+	KEY_I,          // i
+	KEY_J,          // j
+	KEY_K,          // k
+	KEY_L,          // l
+	KEY_M,          // m
+	KEY_N,          // n
+	KEY_O,          // o
+	KEY_P,          // p
+	KEY_Q,          // q
+	KEY_R,          // r
+	KEY_S,          // s
+	KEY_T,          // t
+	KEY_U,          // u
+	KEY_V,          // v
+	KEY_W,          // w
+	KEY_X,          // x
+	KEY_Y,          // y
+	KEY_Z,          // z
+	0x2f|SHIFT,    // 
+	0x31|SHIFT,    // |
+	0x30|SHIFT,    // }
+	0x35|SHIFT,    // ~
+	0				// DEL
+};
+ 
 class UsbKeyboardDevice {	
   public:  
 	UsbKeyboardDevice() 
@@ -364,6 +499,28 @@ class UsbKeyboardDevice {
 		};	    
 
 		usbSetInterrupt((uchar *)&report, sizeof(report));		
+	}
+	
+	void sendAscii(uchar c)
+	{
+		byte keycode = asciimap[c];
+		byte modifiers = 0;
+		if (keycode & 0x80) { 
+			modifiers |= 0x02;
+			keycode &= 0x7F;
+		}
+		sendKeyStroke(keycode, modifiers);
+	}
+	
+	void sendString(char str[])
+	{
+		int i = 0;
+		while (i < strlen(str))
+		{
+			sendAscii(str[i]);
+			delay();
+			i++;
+		}		
 	}
 }; //UsbKeyboardDevice Class
 
