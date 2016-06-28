@@ -97,8 +97,8 @@ PROGMEM const char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] 
     0xc0                          // END_COLLECTION	
 };
 
-/* Keyboard usage values, see usb.org's HID-usage-tables document, chapter
- * 10 Keyboard/Keypad Page for more codes.
+/* 
+ * Keyboard usage values, see usb.org's HID-usage-tables document, chapter
  */
 
 #define KEY_CTRL	0x01
@@ -200,22 +200,22 @@ PROGMEM const char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] 
 
 #define KEY_NUM_LOCK	83
 
-#define KEYPAD_SLASH	84
-#define KEYPAD_ASTERIX	85
-#define KEYPAD_MINUS	86
-#define KEYPAD_PLUS	87
-#define KEYPAD_ENTER	88
-#define KEYPAD_1	89
-#define KEYPAD_2	90
-#define KEYPAD_3	91
-#define KEYPAD_4	92
-#define KEYPAD_5	93
-#define KEYPAD_6	94
-#define KEYPAD_7	95
-#define KEYPAD_8	96
-#define KEYPAD_9	97
-#define KEYPAD_0	98
-#define KEYPAD_PERIOD	99
+#define KEY_PAD_SLASH	84
+#define KEY_PAD_ASTERIX	85
+#define KEY_PAD_MINUS	86
+#define KEY_PAD_PLUS	87
+#define KEY_PAD_ENTER	88
+#define KEY_PAD_1	89
+#define KEY_PAD_2	90
+#define KEY_PAD_3	91
+#define KEY_PAD_4	92
+#define KEY_PAD_5	93
+#define KEY_PAD_6	94
+#define KEY_PAD_7	95
+#define KEY_PAD_8	96
+#define KEY_PAD_9	97
+#define KEY_PAD_0	98
+#define KEY_PAD_PERIOD	99
 
 #define KEY_KEYBOARD_NON_US_BACKSLASH    100
 #define KEY_APPLICATION    101
@@ -253,144 +253,151 @@ PROGMEM const char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] 
 #define KEY_COMMA    133
 #define KEY_EQUAL_SIGN    134
 
+/*
+*  USB_Hut1_12v2 Page 75 chapter 15
+*/
+
+#define CONSUMER_CHANNEL_INCREMENT 0x9C
+#define CONSUMER_CHANNEL_DECREMENT 0x9D
+
+#define CONSUMER_PLAY 0xB0
+#define CONSUMER_PAUSE 0xB1
+#define CONSUMER_STOP 0xB1
+#define CONSUMER_PLAY_PAUSE 0xE2
+#define CONSUMER_MUTE 0xE2
+
+#define CONSUMER_VOLUME_INCREMENT 0xE9
+#define CONSUMER_VOLUME_DECREMENT 0xEA
+
 #define KEY_ARROW_LEFT KEY_LEFT //deprecated
  
-class UsbKeyboardDevice {
+class UsbKeyboardDevice {	
+  public:  
+	UsbKeyboardDevice() 
+	{
+		USBOUT = 0; // TODO: Only for USB pins?
+		USBDDR |= ~USBMASK;
+
+		cli();
+		usbDeviceDisconnect();
+		//_delay_ms(75);	
+		usbDeviceConnect();
+
+		usbInit();
+
+		sei();
+
+		// TODO: Remove the next two lines once we fix
+		//       missing first keystroke bug properly.
+		keyboard_data_t report = {
+			.report_id = REPORT_ID_KEYBOARD,
+			.modifiers = 0,
+			.keycode = 0
+		};
+
+		usbSetInterrupt((uchar *)&report, sizeof(report));
+	}
+
+	void delay(){
+		_delay_ms(75);	
+	}
+
+	void update() {
+		usbPoll();
+	}
+
+	void wait(){
+		while (!usbInterruptIsReady()) {
+			//do nothing
+		}
+	}
+
+	//Send key code down without sending up/release it, you need to send 0 to release it or use SendKeyStroke
+	void sendKey(byte keyStroke, byte modifiers) 
+	{
+		wait();
+		// Note: We wait until we can send keystroke
+		//       so we know the previous keystroke was
+		//       sent.
+
+		keyboard_data_t report = {
+			.report_id = REPORT_ID_KEYBOARD,
+			.modifiers = modifiers,
+			.keycode = keyStroke
+		};
+
+		usbSetInterrupt((uchar *)&report, sizeof(report));
+	}  
 	
-  public:
-  
-  UsbKeyboardDevice() {
-	USBOUT = 0; // TODO: Only for USB pins?
-    USBDDR |= ~USBMASK;
+	//Stroke send key down and up
+	void sendKeyStroke(byte keycode) {
+		sendKeyStroke(keycode, 0);
+	}
 
-    cli();
-    usbDeviceDisconnect();
-    //_delay_ms(75);	
-    usbDeviceConnect();
+	void sendKeyStroke(byte keycode, byte modifiers) 
+	{
+		sendKey(keycode, modifiers);
+		sendKey(0, 0);
+	}  
 
-    usbInit();
+	typedef struct {
+		uint8_t  report_id;
+		uint16_t data;
+	} __attribute__ ((packed)) report_consumer_t;
 
-    sei();
+	void sendConsumerStroke(uint16_t data) 
+	{
+		wait();
 
-    // TODO: Remove the next two lines once we fix
-    //       missing first keystroke bug properly.
-	keyboard_data_t report = {
-		.report_id = REPORT_ID_KEYBOARD,
-		.modifiers = 0,
-		.keycode = 0
-	};
-	
-    usbSetInterrupt((uchar *)&report, sizeof(report));
-  }
+		report_consumer_t report = {
+			.report_id = REPORT_ID_CONSUMER,
+			.data = data
+		};	    
 
-  void delay(){
-	_delay_ms(75);	
-  }
-  
-  void update() {
-    usbPoll();
-  }
-  
-  void wait(){
-    while (!usbInterruptIsReady()) {
-		//do nothing
-    }
-  }
+		usbSetInterrupt((uchar *)&report, sizeof(report));
 
-  void sendKeyStroke(byte keyStroke) {
-    sendKeyStroke(keyStroke, 0);
-  }
+		wait();
 
-  void sendKeyStroke(byte keyStroke, byte modifiers) {
+		report = {
+			.report_id = REPORT_ID_CONSUMER,
+			.data = data
+		};	    
 
-    while (!usbInterruptIsReady()) {
-        // Note: We wait until we can send keystroke
-        //       so we know the previous keystroke was
-        //       sent.
-    }
+		usbSetInterrupt((uchar *)&report, sizeof(report));		
+	}
+}; //UsbKeyboardDevice Class
 
-	keyboard_data_t report = {
-		.report_id = REPORT_ID_KEYBOARD,
-		.modifiers = modifiers,
-		.keycode = keyStroke
-	};
-
-    usbSetInterrupt((uchar *)&report, sizeof(report));
-
-    while (!usbInterruptIsReady()) {
-      // Note: We wait until we can send keystroke
-      //       so we know the previous keystroke was
-      //       sent.
-    }
-
-    // This stops endlessly repeating keystrokes:
-    //memset(&keyboard_data, 0, sizeof(keyboard_data));
-    //usbSetInterrupt((uchar *)&keyboard_data, sizeof(keyboard_data));
-  }  
-  
-  typedef struct {
-    uint8_t  report_id;
-    uint16_t data;
-} __attribute__ ((packed)) report_consumer_t;
-
-  void sendConsumer(uint16_t data) 
-  {
-    while (!usbInterruptIsReady()) {
-        // Note: We wait until we can send keystroke
-        //       so we know the previous keystroke was
-        //       sent.
-    }	
-	
-    report_consumer_t report = {
-        .report_id = REPORT_ID_CONSUMER,
-        .data = data
-	};	    
-
-    usbSetInterrupt((uchar *)&report, sizeof(report));
-
-    //while (!usbInterruptIsReady()) {
-      // Note: We wait until we can send keystroke
-      //       so we know the previous keystroke was
-      //       sent.
-    //}
-
-    // This stops endlessly repeating keystrokes:
-//    memset(&keyboard_data.data, 0, sizeof(keyboard_data.data));
-    //usbSetInterrupt(&keyboard_data.report, sizeof(keyboard_data.data));
-  }
-};
 
 UsbKeyboardDevice UsbKeyboard = UsbKeyboardDevice();
 
 usbMsgLen_t usbFunctionSetup(uchar data[8])
 {
-    usbRequest_t    *rq = (usbRequest_t *)((void *)data);
+	usbRequest_t    *rq = (usbRequest_t *)((void *)data);
 
-    //usbMsgPtr = (uchar *)&UsbKeyboard.keyboard_data;  //it works without it, we need to more tests
-	
-    if((rq->bmRequestType & USBRQ_TYPE_MASK) == USBRQ_TYPE_CLASS)
+	//usbMsgPtr = (uchar *)&UsbKeyboard.keyboard_data;  //it works without it, we need for more tests
+
+	if((rq->bmRequestType & USBRQ_TYPE_MASK) == USBRQ_TYPE_CLASS)
 	{
-      /* class request type */
+		/* class request type */
 
-      if(rq->bRequest == USBRQ_HID_GET_REPORT){
-	/* wValue: ReportType (highbyte), ReportID (lowbyte) */
+		if(rq->bRequest == USBRQ_HID_GET_REPORT){
+			/* wValue: ReportType (highbyte), ReportID (lowbyte) */
 
-	/* we only have one report type, so don't look at wValue */
-        // TODO: Ensure it's okay not to return anything here?
-		return 0;
-
-      } else if(rq->bRequest == USBRQ_HID_GET_IDLE)
-	{
-	//            usbMsgPtr = &idleRate;
-	//            return 1;
-		return 0;
-      } else if(rq->bRequest == USBRQ_HID_SET_IDLE){
+			/* we only have one report type, so don't look at wValue */
+			// TODO: Ensure it's okay not to return anything here?
+			return 0;
+			
+		} else if(rq->bRequest == USBRQ_HID_GET_IDLE){
+			//usbMsgPtr = &idleRate;
+			//return 1;
+			return 0;
+		} else if(rq->bRequest == USBRQ_HID_SET_IDLE){
 			idleRate = rq->wValue.bytes[1];
-      }
-    } else {
-      /* no vendor specific requests implemented */
-    }
-    return 0;
-  }
+		}
+	} else {
+	  /* no vendor specific requests implemented */
+	}
+	return 0;
+}
 
 #endif // __UsbKeyboard_h__
