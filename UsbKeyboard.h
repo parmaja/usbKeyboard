@@ -256,10 +256,9 @@ PROGMEM const char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] 
 #define KEY_ARROW_LEFT KEY_LEFT //deprecated
  
 class UsbKeyboardDevice {
-  public: //it should be protected
-	keyboard_data_t keyboard_data;    // buffer for HID reports	
 	
   public:
+  
   UsbKeyboardDevice() {
 	USBOUT = 0; // TODO: Only for USB pins?
     USBDDR |= ~USBMASK;
@@ -275,15 +274,27 @@ class UsbKeyboardDevice {
 
     // TODO: Remove the next two lines once we fix
     //       missing first keystroke bug properly.
-    memset(&keyboard_data, 0, sizeof(keyboard_data));
-    usbSetInterrupt((uchar *)&keyboard_data, sizeof(keyboard_data));
+	keyboard_data_t report = {
+		.report_id = REPORT_ID_KEYBOARD,
+		.modifiers = 0,
+		.keycode = 0
+	};
+	
+    usbSetInterrupt((uchar *)&report, sizeof(report));
   }
 
   void delay(){
 	_delay_ms(75);	
   }
+  
   void update() {
     usbPoll();
+  }
+  
+  void wait(){
+    while (!usbInterruptIsReady()) {
+		//do nothing
+    }
   }
 
   void sendKeyStroke(byte keyStroke) {
@@ -298,13 +309,13 @@ class UsbKeyboardDevice {
         //       sent.
     }
 
-    memset(&keyboard_data, 0, sizeof(keyboard_data));
+	keyboard_data_t report = {
+		.report_id = REPORT_ID_KEYBOARD,
+		.modifiers = modifiers,
+		.keycode = keyStroke
+	};
 
-	keyboard_data.report_id = REPORT_ID_KEYBOARD;
-    keyboard_data.modifiers = modifiers;
-    keyboard_data.keycode = keyStroke;
-
-    usbSetInterrupt((uchar *)&keyboard_data, sizeof(keyboard_data));
+    usbSetInterrupt((uchar *)&report, sizeof(report));
 
     while (!usbInterruptIsReady()) {
       // Note: We wait until we can send keystroke
@@ -313,16 +324,14 @@ class UsbKeyboardDevice {
     }
 
     // This stops endlessly repeating keystrokes:
-    memset(&keyboard_data, 0, sizeof(keyboard_data));
-    usbSetInterrupt((uchar *)&keyboard_data, sizeof(keyboard_data));
-  }
-  
+    //memset(&keyboard_data, 0, sizeof(keyboard_data));
+    //usbSetInterrupt((uchar *)&keyboard_data, sizeof(keyboard_data));
+  }  
   
   typedef struct {
     uint8_t  report_id;
     uint16_t data;
 } __attribute__ ((packed)) report_consumer_t;
-
 
   void sendConsumer(uint16_t data) 
   {
@@ -357,7 +366,7 @@ usbMsgLen_t usbFunctionSetup(uchar data[8])
 {
     usbRequest_t    *rq = (usbRequest_t *)((void *)data);
 
-    usbMsgPtr = (uchar *)&UsbKeyboard.keyboard_data;  //it works without it, we need to more tests
+    //usbMsgPtr = (uchar *)&UsbKeyboard.keyboard_data;  //it works without it, we need to more tests
 	
     if((rq->bmRequestType & USBRQ_TYPE_MASK) == USBRQ_TYPE_CLASS)
 	{
