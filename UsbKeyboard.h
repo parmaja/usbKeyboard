@@ -99,6 +99,7 @@ PROGMEM const char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] 
 
 /* 
  * Keyboard usage values, see usb.org's HID-usage-tables document, chapter
+ *	or http://www.freebsddiary.org/APC/usb_hid_usages.php 
  */
 
 #define KEY_CTRL	0x01
@@ -434,7 +435,7 @@ class UsbKeyboardDevice {
 	}
 
 	void delay(){
-		_delay_ms(75);	
+		_delay_ms(10);	
 	}
 
 	void update() {
@@ -443,7 +444,7 @@ class UsbKeyboardDevice {
 
 	void wait(){
 		while (!usbInterruptIsReady()) {
-			//do nothing
+			_delay_ms(1);
 		}
 	}
 
@@ -461,7 +462,7 @@ class UsbKeyboardDevice {
 			.keycode = keyStroke
 		};
 
-		usbSetInterrupt((uchar *)&report, sizeof(report));
+		usbSetInterrupt((uchar *)&report, sizeof(report));		
 	}  
 	
 	//Stroke send key down and up
@@ -473,6 +474,7 @@ class UsbKeyboardDevice {
 	{
 		sendKey(keycode, modifiers);
 		sendKey(0, 0);
+		wait();		
 	}  
 
 	typedef struct {
@@ -499,25 +501,31 @@ class UsbKeyboardDevice {
 		};	    
 
 		usbSetInterrupt((uchar *)&report, sizeof(report));		
+		
+		wait();
 	}
 	
 	void sendAscii(uchar c)
 	{
-		byte keycode = asciimap[c];
-		byte modifiers = 0;
-		if (keycode & 0x80) { 
-			modifiers |= 0x02;
-			keycode &= 0x7F;
+		if (c < sizeof(asciimap)) {
+			byte keycode = asciimap[c];
+			byte modifiers = 0;
+			if (keycode & 0x80) { 
+				modifiers |= 0x02;
+				keycode &= 0x7F;
+			}		
+			sendKeyStroke(keycode, modifiers);
+			//sendKeyStroke(KEY_6, 0);
+		} else {
 		}
-		sendKeyStroke(keycode, modifiers);
 	}
 	
 	void sendString(char str[])
 	{
-		int i = 0;
+		unsigned int i = 0;
 		while (i < strlen(str))
 		{
-			sendAscii(str[i]);
+			sendAscii(str[i]);			
 			delay();
 			i++;
 		}		
@@ -529,17 +537,16 @@ UsbKeyboardDevice UsbKeyboard = UsbKeyboardDevice();
 
 usbMsgLen_t usbFunctionSetup(uchar data[8])
 {
-	usbRequest_t    *rq = (usbRequest_t *)((void *)data);
-
-	//usbMsgPtr = (uchar *)&UsbKeyboard.keyboard_data;  //it works without it, we need for more tests
+	usbRequest_t    *rq = (usbRequest_t *)((void *)data);	
 
 	if((rq->bmRequestType & USBRQ_TYPE_MASK) == USBRQ_TYPE_CLASS)
 	{
 		/* class request type */
 
-		if(rq->bRequest == USBRQ_HID_GET_REPORT){
+		if(rq->bRequest == USBRQ_HID_GET_REPORT)
+		{
 			/* wValue: ReportType (highbyte), ReportID (lowbyte) */
-
+			//usbMsgPtr = (uchar *)&UsbKeyboard.keyboard_data;
 			/* we only have one report type, so don't look at wValue */
 			// TODO: Ensure it's okay not to return anything here?
 			return 0;
