@@ -407,6 +407,8 @@ const uint8_t asciimap[128] =
 	0				// DEL
 };
  
+//static keyboard_data_t reportData;
+
 class UsbKeyboardDevice {	
   public:  
 	UsbKeyboardDevice() 
@@ -414,12 +416,12 @@ class UsbKeyboardDevice {
 		USBOUT = 0; // TODO: Only for USB pins?
 		USBDDR |= ~USBMASK;
 
+		usbInit();
+
 		cli();
 		usbDeviceDisconnect();
 		//_delay_ms(75);	
 		usbDeviceConnect();
-
-		usbInit();
 
 		sei();
 
@@ -442,9 +444,9 @@ class UsbKeyboardDevice {
 		usbPoll();
 	}
 
-	void wait(){
+	void wait(){		
 		while (!usbInterruptIsReady()) {
-			_delay_ms(1);
+			update();
 		}
 	}
 
@@ -538,6 +540,8 @@ UsbKeyboardDevice UsbKeyboard = UsbKeyboardDevice();
 usbMsgLen_t usbFunctionSetup(uchar data[8])
 {
 	usbRequest_t    *rq = (usbRequest_t *)((void *)data);	
+	
+	//static uchar dataBuffer[4];  /* buffer must stay valid when usbFunctionSetup returns */
 
 	if((rq->bmRequestType & USBRQ_TYPE_MASK) == USBRQ_TYPE_CLASS)
 	{
@@ -547,14 +551,14 @@ usbMsgLen_t usbFunctionSetup(uchar data[8])
 		{
 			/* wValue: ReportType (highbyte), ReportID (lowbyte) */
 			//usbMsgPtr = (uchar *)&UsbKeyboard.keyboard_data;
-			/* we only have one report type, so don't look at wValue */
+			/* we only have one report type, so don't look at wValue */ 
 			// TODO: Ensure it's okay not to return anything here?
+			//return sizeof(reportBuffer);
 			return 0;
 			
 		} else if(rq->bRequest == USBRQ_HID_GET_IDLE){
-			//usbMsgPtr = &idleRate;
-			//return 1;
-			return 0;
+			usbMsgPtr = &idleRate;
+			return 1;
 		} else if(rq->bRequest == USBRQ_HID_SET_IDLE){
 			idleRate = rq->wValue.bytes[1];
 		}
