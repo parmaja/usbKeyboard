@@ -34,20 +34,6 @@ extern "C"
 }
 #endif
 
-typedef uint8_t byte;
-
-typedef struct 
-{
-	uint8_t report_id;
-    uint8_t modifiers;
-	uint8_t keycode; //TODO should be array
-	//uint8_t keycode[6];
-} keyboard_data_t;
-
-#define KEYS_COUNT 1 // Minimum of 1, we will increase it in the future
-
-static uchar    idleRate;           // in 4 ms units
-
 /* We use a simplifed keyboard report descriptor which does not support the
  * boot protocol. We don't allow setting status LEDs and but we do allow
  * simultaneous key presses.
@@ -282,7 +268,7 @@ PROGMEM const char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] 
  
 //ported from https://github.com/aduitsis/ardumultimedia/blob/master/HID.cpp
 #define SHIFT 0x80
-const uint8_t asciimap[128] =
+PROGMEM const uint8_t asciimap[128] =
 {
 	0x00,             // NUL
 	0x00,             // SOH
@@ -460,6 +446,7 @@ int         x, optimumDev, targetValue = (unsigned)(1499 * (double)F_CPU / 10.5e
     }
     OSCCAL = optimumValue;
 }
+
 /*
 Note: This calibration algorithm may try OSCCAL values of up to 192 even if
 the optimum value is far below 192. It may therefore exceed the allowed clock
@@ -477,6 +464,20 @@ void usbEventResetReady(void)
     eeprom_write_byte(0, OSCCAL);   /* store the calibrated value in EEPROM */
 }
 #endif _OSCCAL_
+
+typedef uint8_t byte;
+
+typedef struct 
+{
+	uint8_t report_id;
+    uint8_t modifiers;
+	uint8_t keycode; //TODO should be array
+	//uint8_t keycode[6];
+} keyboard_data_t;
+
+#define KEYS_COUNT 1 // Minimum of 1, we will increase it in the future
+
+static uchar idleRate;           // in 4 ms units
 
 usbMsgLen_t usbFunctionSetup(uchar data[8])
 {
