@@ -53,11 +53,11 @@ extern "C"
  * //http://www.microchip.com/forums/FindPost/878780 
  */
  
-#define KEYCODE_LENGTH 1
-#define REPORT_ID_KEYBOARD 1
-#define REPORT_ID_CONSUMER 2
+#define KEYCODE_LENGTH 0x01
+#define REPORT_ID_KEYBOARD 0x01
+#define REPORT_ID_CONSUMER 0x2
 
-PROGMEM const char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] = // USB report descriptor
+PROGMEM const uchar usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] = // USB report descriptor
 {
 	//LENGTH=40
 	0x05, 0x01,                    //USAGE_PAGE (Generic Desktop)
@@ -222,7 +222,7 @@ PROGMEM const char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] 
 #define KEY_KEYBOARD_NON_US_BACKSLASH    100
 #define KEY_APPLICATION    101
 #define KEY_POWER    102
-#define KEY_EQUAL    103
+#define KEY_EQUAL_    103 //TODO Fix name
 #define KEY_F13    104
 #define KEY_F14   105
 #define KEY_F15    106
@@ -252,7 +252,7 @@ PROGMEM const char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] 
 #define KEY_LOCKING_CAPS LOCK    130
 #define KEY_LOCKING_NUM LOCK    131
 #define KEY_LOCKING_SCROLL_LOCK    132
-#define KEY_COMMA    133
+#define KEY_COMMA_SIGN    133 //TODO Fix Name
 #define KEY_EQUAL_SIGN    134
 
 /*
@@ -277,7 +277,7 @@ PROGMEM const char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] 
 
 #define SHIFT 0x80
 
-PROGMEM const uint8_t asciimap[128] =
+static const uint8_t asciimap[128] =
 {
 	0x00,             // NUL
 	0x00,             // SOH
@@ -455,9 +455,9 @@ usbMsgLen_t usbFunctionSetup(uchar data[8])
 	return 0;
 }
 
-class UsbKeyboardDevice {	
-  public:  
-	UsbKeyboardDevice() 
+namespace UsbKeyboard {	
+  
+	PROGMEM void init() 
 	{
 		USBOUT = 0; // TODO: Only for USB pins?
 		USBDDR |= ~USBMASK;
@@ -470,7 +470,7 @@ class UsbKeyboardDevice {
 		if(calibrationValue != 0xff){
 			OSCCAL = calibrationValue;
 		}		
-#endif _OSCCAL_
+#endif 
 
 		//MCUSR &= ~(1 << WDRF);
     	//wdt_disable(); 	
@@ -532,11 +532,7 @@ class UsbKeyboardDevice {
 	}  
 	
 	//Stroke send key down and up
-	void sendKeyStroke(byte keycode) {
-		sendKeyStroke(keycode, 0);
-	}
-
-	void sendKeyStroke(byte keycode, byte modifiers) 
+	void sendKeyStroke(byte keycode, byte modifiers = 0) 
 	{
 		sendKey(keycode, modifiers);
 		sendKey(0, 0);
@@ -563,7 +559,7 @@ class UsbKeyboardDevice {
 
 		report = {
 			.report_id = REPORT_ID_CONSUMER,
-			.data = data
+			.data = 0
 		};	    
 
 		usbSetInterrupt((uchar *)&report, sizeof(report));		
@@ -571,7 +567,7 @@ class UsbKeyboardDevice {
 		wait();
 	}
 	
-	void sendAscii(uchar c)
+	void sendAscii(const uchar c)
 	{
 		if (c < sizeof(asciimap)) {
 			byte keycode = asciimap[c];
@@ -586,7 +582,7 @@ class UsbKeyboardDevice {
 		}
 	}
 	
-	void sendString(char str[])
+	void sendString(const char str[])
 	{
 		unsigned int i = 0;
 		while (i < strlen(str))
@@ -596,9 +592,6 @@ class UsbKeyboardDevice {
 			i++;
 		}		
 	}
-}; //UsbKeyboardDevice Class
-
-
-UsbKeyboardDevice UsbKeyboard = UsbKeyboardDevice();
+}; //UsbKeyboard
 
 #endif // __UsbKeyboard_h__
