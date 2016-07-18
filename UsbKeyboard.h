@@ -276,8 +276,11 @@ PROGMEM const uchar usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH]
 //ported from https://github.com/aduitsis/ardumultimedia/blob/master/HID.cpp
 
 #define SHIFT 0x80
+/*
+* ref: http://www.avrfreaks.net/forum/tut-c-gcc-and-progmem-attribute?name=PNphpBB2&file=viewtopic&t=38003
+*/
 
-static const uint8_t asciimap[128] =
+PROGMEM static const uint8_t asciimap[128] =
 {
 	0x00,             // NUL
 	0x00,             // SOH
@@ -570,7 +573,7 @@ namespace UsbKeyboard {
 	void sendAscii(const uchar c)
 	{
 		if (c < sizeof(asciimap)) {
-			byte keycode = asciimap[c];
+			byte keycode = pgm_read_byte(&asciimap[c]);
 			byte modifiers = 0;
 			if (keycode & 0x80) { 
 				modifiers |= 0x02;
