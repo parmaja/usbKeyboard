@@ -7,6 +7,9 @@ https://github.com/gloob/vusb-for-arduino
 
 http://code.google.com/p/vusb-for-arduino/
 
+# Notes
+
+Brash "master" is my upstream if you want last stable use branch "release" or last tag.
 
 Arduino / AVRUSB integration
 ----------------------------
