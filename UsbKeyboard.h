@@ -1,12 +1,16 @@
-/*
- * Based on Obdev's AVRUSB code and under the same license.
- * 
- * TODO: Make a proper file header. :-)
- */
+/**
+* Based on Obdev's AVRUSB code and under the same license.
+* 
+* usage:
+*   void setup() {	
+*     TIMSK &= !(1 << TOIE0); // Disable timer0 as it can interfere with USB timing
+*     UsbKeyboard::init();
+*
+*/
 #ifndef __UsbKeyboard_h__
 #define __UsbKeyboard_h__
 
-//#define _OSCCAL_ //Enable it id you want to use internal oscillator
+//#define _OSCCAL_ //Enable it id you want to use internal oscillator TODO buggy
 
 /*
 *
@@ -97,6 +101,20 @@ PROGMEM const uchar usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH]
     0x81, 0x00,                    //   INPUT (Data,Array,Abs)
     0xc0                          // END_COLLECTION	
 };
+/* for data 
+PROGMEM const char usbHidReportDescriptor[22] = {   // USB report descriptor 
+    0x06, 0x00, 0xff,              // USAGE_PAGE (Generic Desktop)
+    0x09, 0x01,                    // USAGE (Vendor Usage 1)
+    0xa1, 0x01,                    // COLLECTION (Application)
+    0x15, 0x00,                    //   LOGICAL_MINIMUM (0)
+    0x26, 0xff, 0x00,              //   LOGICAL_MAXIMUM (255)
+    0x75, 0x08,                    //   REPORT_SIZE (8)
+    0x95, 0x01,                    //   REPORT_COUNT (1)
+    0x09, 0x00,                    //   USAGE (Undefined)
+    0xb2, 0x02, 0x01,              //   FEATURE (Data,Var,Abs,Buf)
+    0xc0                           // END_COLLECTION
+};
+*/
 
 /* 
  * Keyboard usage values, see usb.org's HID-usage-tables document, chapter
@@ -412,6 +430,10 @@ PROGMEM static const uint8_t asciimap[128] =
 	0x35|SHIFT,    // ~
 	0				// DEL
 };
+
+
+#define CUSTOM_RQ_SET_STATUS    1
+#define CUSTOM_RQ_GET_STATUS 	2
  
 typedef uint8_t byte;
 
@@ -419,21 +441,38 @@ typedef struct
 {
 	uint8_t report_id;
     uint8_t modifiers;
-	uint8_t keycode; //TODO should be array
-	//uint8_t keycode[6];
+	uint8_t keycode; //Maybe be array, but one code is good
 } keyboard_data_t;
-
-#define KEYS_COUNT 1 // Minimum of 1, we will increase it in the future
 
 static uchar idleRate;           // in 4 ms units
 
 usbMsgLen_t usbFunctionSetup(uchar data[8])
 {
-	usbRequest_t    *rq = (usbRequest_t *)((void *)data);	
+	usbRequest_t    *rq = (usbRequest_t *)((void *)data);		
 	
-	//static uchar dataBuffer[4];  /* buffer must stay valid when usbFunctionSetup returns */
-
-	if((rq->bmRequestType & USBRQ_TYPE_MASK) == USBRQ_TYPE_CLASS)
+/* Send and receive data from host 
+* Ref: https://github.com/obdev/v-usb/blob/master/examples/hid-custom-rq/firmware/main.c
+*
+*/
+    if((rq->bmRequestType & USBRQ_TYPE_MASK) == USBRQ_TYPE_VENDOR)
+	{        
+        if(rq->bRequest == CUSTOM_RQ_SET_STATUS)
+		{
+            if(rq->wValue.bytes[0] == 1){    
+            }else{                          
+            }
+        } 
+		else if(rq->bRequest == CUSTOM_RQ_GET_STATUS)
+		{
+            static uchar dataBuffer[1];     // buffer must stay valid when usbFunctionSetup returns 
+            dataBuffer[0] = 101; //for test
+            usbMsgPtr = dataBuffer;         // tell the driver which data to return 
+            //return sizeof(dataBuffer);                       // tell the driver to send 1 byte 
+			return 1;
+        }
+	} 
+/* Report to the host */	
+	else if((rq->bmRequestType & USBRQ_TYPE_MASK) == USBRQ_TYPE_CLASS)
 	{
 		/* class request type */
 
@@ -458,6 +497,12 @@ usbMsgLen_t usbFunctionSetup(uchar data[8])
 	return 0;
 }
 
+/*
+*  UsbKeyboard namespace
+*
+*
+*/
+
 namespace UsbKeyboard {	
   
 	PROGMEM void init() 
@@ -469,7 +514,7 @@ namespace UsbKeyboard {
 #ifdef _OSCCAL_		
 		uchar   calibrationValue;
 		//Clock calibration setup
-		calibrationValue = eeprom_read_byte(0); /* calibration value from last time */
+		calibrationValue = eeprom_read_byte(0); // calibration value from last time 
 		if(calibrationValue != 0xff){
 			OSCCAL = calibrationValue;
 		}		
@@ -480,12 +525,16 @@ namespace UsbKeyboard {
 		
 		cli();
 		usbDeviceDisconnect();
-		//
+		int i = 250;
+		while(--i){             // fake USB disconnect for > 250 ms 
+			//wdt_reset();
+			_delay_ms(1);
+		}		
 		usbDeviceConnect();
 		usbInit();
 		sei();
 		
-		int i = 100;
+		i = 100; //Delay to make usb comunicate 
 		while(--i) {
 			_delay_ms(1);
 			usbPoll();
@@ -581,7 +630,8 @@ namespace UsbKeyboard {
 			}		
 			sendKeyStroke(keycode, modifiers);
 			//sendKeyStroke(KEY_6, 0);
-		} else {
+		} else
+    {
 		}
 	}
 	
